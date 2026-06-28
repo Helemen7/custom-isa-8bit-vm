@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "InstructionSignature.hpp"
+#include "Loader.hpp"
+#include "MemoryManager.hpp"
 #include "types.hpp"
 
 class VM {
@@ -19,16 +21,17 @@ class VM {
 	VM(std::map<InstructionSignature, Opcode> &instruction_set,
 	   const std::unordered_map<std::string_view, uint8_t> &_register_map);
 	void reset();
-	std::pair<MemCell *, MemCell *>
+	std::pair<MemAddr, MemAddr>
 	load_program_in_ram(std::filesystem::path path_to_bin);
-	void exec(MemCell *first_sector, MemCell *last_sector);
+	void exec(MemAddr first_sector, MemAddr last_sector);
 	std::vector<std::pair<std::string_view, MemCell>> register_snapshot();
 
       private:
 	std::array<InstructionSignature, 0xFF + 1> instruction_lookup;
-	MemCell *PC;
-	MemCell *SP;
+	MemAddr PC;
+	Loader program_loader;
 	std::vector<MemCell> RAM;
+	MemoryManager mem_manager;
 	std::vector<Register> registers;
 	Flags flags;
 	const std::unordered_map<std::string_view, uint8_t> &register_map;
