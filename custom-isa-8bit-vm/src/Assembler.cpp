@@ -44,18 +44,35 @@ std::vector<Opcode> Assembler::instruction_to_opcode(
 			type_of_args[i - 1] = Type::NUMBER;
 		} else {
 			// Parsing failed
-			if (instruction[i][0] == '\"') {
-				type_of_args[i - 1] = Type::WORD;
-			} else if (addresses_of_labels.contains(
-				       instruction[i])) {
-				type_of_args[i - 1] = Type::ADDRESS;
-			} else {
+			std::string arg = instruction[i];
+
+			if (arg.contains('[') && arg.contains(']')) {
+				std::string inside =
+				    arg.substr(1, arg.size() - 2);
+
+				if (register_map.contains(inside)) {
+					type_of_args[i - 1] =
+					    Type::INDIRECT_REG;
+				} else if (std::isdigit(inside[0]) ||
+					   inside[0] == '-') {
+					type_of_args[i - 1] =
+					    Type::INDIRECT_MEM;
+				} else {
+					type_of_args[i - 1] =
+					    Type::INDIRECT_LBL;
+				}
+			} else if (std::isdigit(arg[0]) ||
+				   (arg[0] == '-' && arg.size() > 1)) {
+				type_of_args[i - 1] = Type::NUMBER;
+			} else if (register_map.contains(arg)) {
 				type_of_args[i - 1] = Type::REGISTER;
+			} else {
+				type_of_args[i - 1] = Type::ADDRESS;
 			}
 		}
 	}
 
-	InstructionSignature sig(instruction[0], type_of_args);
+	InstructionSignature sig(instruction[0], number_of_args);
 
 	auto it{instruction_set.find(sig)};
 	if (it == instruction_set.end()) {
@@ -66,15 +83,38 @@ std::vector<Opcode> Assembler::instruction_to_opcode(
 	codes.push_back(it->second);
 	for (auto i{1uz}; i < instruction.size(); ++i) {
 		Type type = type_of_args[i - 1];
-		if (type == Type::ADDRESS) {
-			auto addr{addresses_of_labels.at(instruction[i])};
+		codes.push_back(type);
+		std::string inside{instruction[i]};
+		if (type == Type::INDIRECT_LBL || type == Type::INDIRECT_REG ||
+		    type == Type::INDIRECT_MEM) {
+			inside = inside.substr(1, inside.size() - 2);
+		}
+		if (type == Type::ADDRESS || type == Type::INDIRECT_LBL ||
+		    type == Type::INDIRECT_MEM) {
+			MemAddr addr{};
+			if (type != Type::INDIRECT_MEM) {
+				auto it = addresses_of_labels.find(inside);
+				if (it == addresses_of_labels.end()) {
+					throw std::runtime_error(std::format(
+					    "Label not found \"{}\"", inside));
+				}
+				addr = it->second;
+			} else {
+				// Indirect memory (such as [500]), already
+				// contains a memory (offet) address to use
+				addr = std::stoull(inside);
+			}
+
 			MemCell high_byte{static_cast<MemCell>(
 			    (addr >> (sizeof(MemCell) * 8)) & 0xFF)};
 			MemCell low_byte{static_cast<MemCell>(addr & 0xFF)};
 			codes.push_back(high_byte);
 			codes.push_back(low_byte);
-		} else if (type == Type::REGISTER) {
-			auto it{register_map.find(instruction[i])};
+
+		} else if (type == Type::REGISTER ||
+			   type == Type::INDIRECT_REG) {
+			auto it{register_map.find(inside)};
+
 			if (it != register_map.end()) {
 				codes.push_back(it->second);
 			} else {
@@ -82,7 +122,8 @@ std::vector<Opcode> Assembler::instruction_to_opcode(
 				    "Non existant register used");
 			}
 		} else if (type == Type::NUMBER) {
-			codes.push_back(std::stoi(instruction[i]));
+			codes.push_back(
+			    static_cast<MemCell>(std::stoi(inside)));
 		}
 	}
 	return codes;
@@ -120,16 +161,37 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 				else if (addresses_of_labels.contains(arg) ||
 					 isAllAlpha(arg))
 					arg_types.push_back(Type::ADDRESS);
-				else
+				else if (arg.front() == '[' &&
+					 arg.back() == ']') {
+					std::string inside =
+					    arg.substr(1, arg.size() - 2);
+
+					if (register_map.contains(inside)) {
+						arg_types.push_back(
+						    Type::INDIRECT_REG);
+					} else if (std::isdigit(inside[0]) ||
+						   inside[0] == '-') {
+						arg_types.push_back(
+						    Type::INDIRECT_MEM);
+					} else {
+						arg_types.push_back(
+						    Type::INDIRECT_LBL);
+					}
+				} else {
 					arg_types.push_back(Type::NUMBER);
+				}
 			}
-			InstructionSignature sig{first_tok, arg_types};
+			InstructionSignature sig{first_tok, arg_types.size()};
 
 			if (instruction_set.contains(sig)) {
 				std::size_t instruction_size = sizeof(Opcode);
 				for (Type t : arg_types) {
 					instruction_size +=
-					    1 + (t == Type::ADDRESS);
+					    1; // Type byte for each argument
+					instruction_size +=
+					    1 + (t == Type::ADDRESS ||
+						 t == Type::INDIRECT_LBL ||
+						 t == Type::INDIRECT_MEM);
 				}
 				current_dimension += instruction_size;
 			} else {
@@ -198,8 +260,6 @@ void Assembler::asm_to_bin(AsmCode code, std::filesystem::path path) {
 	}
 
 	outBinFile.close();
-
-	std::cout << std::endl;
 }
 
 void Assembler::asm_file_to_code(std::filesystem::path path,

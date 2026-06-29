@@ -8,13 +8,14 @@
 #include "InstructionSignature.hpp"
 #include "Loader.hpp"
 #include "MemoryManager.hpp"
+#include "RawArgument.hpp"
+#include "Type.hpp"
 #include "types.hpp"
 
 class VM {
 	struct Flags {
 		bool zero{false};
 		bool sign{false};
-		bool carry{false}; // TODO: Implement carry
 	};
 
       public:
@@ -33,7 +34,8 @@ class VM {
 	std::vector<Register> registers;
 	Flags flags;
 	const std::unordered_map<std::string_view, uint8_t> &register_map;
-	void single_exec(Opcode instruction);
 	void
 	reverse_is(std::map<InstructionSignature, Opcode> &instruction_set);
+	MemCell &resolve_writeable_arg(Process &proc, Type type, MemAddr arg);
+	RawArgument fetch_argument(Process &proc);
 };

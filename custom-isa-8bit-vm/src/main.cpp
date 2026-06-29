@@ -9,60 +9,20 @@
 
 int main() {
 	std::map<InstructionSignature, Opcode> instruction_table;
-	instruction_table.insert(
-	    {InstructionSignature{"MOV", {Type::REGISTER, Type::NUMBER}},
-	     0x12});
-	instruction_table.insert(
-	    {InstructionSignature{"MOV", {Type::REGISTER, Type::REGISTER}},
-	     0x22});
-	instruction_table.insert(
-	    {InstructionSignature{"PRINT", {Type::REGISTER}}, 0x01});
-	instruction_table.insert(
-	    {InstructionSignature{"PRINT", {Type::NUMBER}}, 0x11});
-	instruction_table.insert(
-	    {InstructionSignature{"PRINTFLUSH", {}}, 0x10});
-	instruction_table.insert(
-	    {InstructionSignature{"ADD", {Type::REGISTER, Type::NUMBER}},
-	     0x32});
-	instruction_table.insert(
-	    {InstructionSignature{"ADD", {Type::REGISTER, Type::REGISTER}},
-	     0x42});
-	instruction_table.insert(
-	    {InstructionSignature{"SUB", {Type::REGISTER, Type::NUMBER}},
-	     0x52});
-	instruction_table.insert(
-	    {InstructionSignature{"SUB", {Type::REGISTER, Type::REGISTER}},
-	     0x62});
-	instruction_table.insert(
-	    {InstructionSignature{"MUL", {Type::REGISTER, Type::NUMBER}},
-	     0x72});
-	instruction_table.insert(
-	    {InstructionSignature{"MUL", {Type::REGISTER, Type::REGISTER}},
-	     0x82});
-	instruction_table.insert(
-	    {InstructionSignature{"DIV", {Type::REGISTER, Type::NUMBER}},
-	     0x92});
-	instruction_table.insert(
-	    {InstructionSignature{"DIV", {Type::REGISTER, Type::REGISTER}},
-	     0xA2});
-	instruction_table.insert(
-	    {InstructionSignature{"INPUT", {Type::REGISTER}}, 0x21});
-	instruction_table.insert(
-	    {InstructionSignature{"JMP", {Type::ADDRESS}}, 0x31});
-	instruction_table.insert(
-	    {InstructionSignature{"CMP", {Type::REGISTER, Type::REGISTER}},
-	     0xB2});
-	instruction_table.insert(
-	    {InstructionSignature{"CMP", {Type::REGISTER, Type::NUMBER}},
-	     0xC2});
-	instruction_table.insert(
-	    {InstructionSignature{"JE", {Type::ADDRESS}}, 0x41});
-	instruction_table.insert(
-	    {InstructionSignature{"JNE", {Type::ADDRESS}}, 0x51});
-	instruction_table.insert(
-	    {InstructionSignature{"JG", {Type::ADDRESS}}, 0x61});
-	instruction_table.insert(
-	    {InstructionSignature{"JNG", {Type::ADDRESS}}, 0x71});
+	instruction_table.insert({InstructionSignature{"MOV", 2}, 0x12});
+	instruction_table.insert({InstructionSignature{"PRINT", 1}, 0x01});
+	instruction_table.insert({InstructionSignature{"PRINTFLUSH", 0}, 0x10});
+	instruction_table.insert({InstructionSignature{"ADD", 2}, 0x32});
+	instruction_table.insert({InstructionSignature{"SUB", 2}, 0x52});
+	instruction_table.insert({InstructionSignature{"MUL", 2}, 0x72});
+	instruction_table.insert({InstructionSignature{"DIV", 2}, 0x92});
+	instruction_table.insert({InstructionSignature{"INPUT", 1}, 0x21});
+	instruction_table.insert({InstructionSignature{"JMP", 1}, 0x31});
+	instruction_table.insert({InstructionSignature{"CMP", 2}, 0xB2});
+	instruction_table.insert({InstructionSignature{"JE", 1}, 0x41});
+	instruction_table.insert({InstructionSignature{"JNE", 1}, 0x51});
+	instruction_table.insert({InstructionSignature{"JG", 1}, 0x61});
+	instruction_table.insert({InstructionSignature{"JNG", 1}, 0x71});
 
 	instruction_table.insert({InstructionSignature{"HALT", {}}, 0xFF});
 
