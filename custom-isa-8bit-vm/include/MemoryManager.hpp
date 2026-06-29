@@ -13,6 +13,7 @@ class MemoryManager {
 	MemAddr allocate(std::size_t bytes);
 	void free(MemAddr start_region, std::size_t bytes);
 	bool check_integrity();
+	void reset();
 
       private:
 	std::vector<MemCell> &RAM;

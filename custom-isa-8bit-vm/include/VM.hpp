@@ -21,14 +21,12 @@ class VM {
 	VM(std::map<InstructionSignature, Opcode> &instruction_set,
 	   const std::unordered_map<std::string_view, uint8_t> &_register_map);
 	void reset();
-	std::pair<MemAddr, MemAddr>
-	load_program_in_ram(std::filesystem::path path_to_bin);
-	void exec(MemAddr first_sector, MemAddr last_sector);
+	Process load_program_in_ram(std::filesystem::path path_to_bin);
+	void exec(Process &proc);
 	std::vector<std::pair<std::string_view, MemCell>> register_snapshot();
 
       private:
 	std::array<InstructionSignature, 0xFF + 1> instruction_lookup;
-	MemAddr PC;
 	Loader program_loader;
 	std::vector<MemCell> RAM;
 	MemoryManager mem_manager;
@@ -39,5 +37,3 @@ class VM {
 	void
 	reverse_is(std::map<InstructionSignature, Opcode> &instruction_set);
 };
-
-// TODO: Make reset function

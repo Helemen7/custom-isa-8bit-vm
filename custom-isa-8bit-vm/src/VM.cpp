@@ -18,7 +18,6 @@ VM::VM(std::map<InstructionSignature, Opcode> &instruction_set,
        const std::unordered_map<std::string_view, uint8_t> &_register_map)
     : registers(static_cast<std::size_t>(VMRegisters::COUNT)), RAM(64'000),
       register_map(_register_map), mem_manager(RAM) {
-	PC = 0;
 	reverse_is(instruction_set);
 }
 
@@ -28,33 +27,24 @@ void VM::reverse_is(std::map<InstructionSignature, Opcode> &instruction_set) {
 	}
 }
 
-std::pair<MemAddr, MemAddr>
-VM::load_program_in_ram(std::filesystem::path path_to_bin) {
+Process VM::load_program_in_ram(std::filesystem::path path_to_bin) {
 
-	MemAddr first_sector{
+	Process proc{
 	    program_loader.load_program(path_to_bin, mem_manager, RAM)};
 
-	MemAddr last_sector{static_cast<MemAddr>(
-	    first_sector + std::filesystem::file_size(path_to_bin))};
-
-	return {first_sector, last_sector};
+	return proc;
 }
 
-void VM::exec(MemAddr first_sector, MemAddr last_sector) {
+void VM::exec(Process &proc) {
 	// Bootstrap offset is in first 2 bytes (start label position)
-	MemAddr high = first_sector;
-	MemAddr low = first_sector + 1;
-	MemAddr offset = (RAM[high] << sizeof(MemCell) * 8) | RAM[low];
-	PC = first_sector + offset;
-
 	std::size_t row{1uz};
 	bool running{true};
-	while (running && PC <= last_sector) {
+	while (running && proc.PC <= proc.last_code_sector) {
 		std::size_t n_args =
-		    RAM[PC] & 0x0F; // Second digit is argument number
+		    RAM[proc.PC] & 0x0F; // Second digit is argument number
 
 		auto lookup_result =
-		    instruction_lookup[static_cast<uint8_t>(RAM[PC])];
+		    instruction_lookup[static_cast<uint8_t>(RAM[proc.PC])];
 
 		std::vector<uint8_t> args;
 
@@ -62,12 +52,12 @@ void VM::exec(MemAddr first_sector, MemAddr last_sector) {
 			args.reserve(lookup_result.arg_types.size());
 
 			for (auto i{0uz}; i < n_args; ++i) {
-				args[i] = RAM[PC + 1 + i];
+				args[i] = RAM[proc.PC + 1 + i];
 			}
 		}
 		int tmp{};
 
-		switch (static_cast<uint8_t>(RAM[PC])) {
+		switch (static_cast<uint8_t>(RAM[proc.PC])) {
 		case 0x12:
 			registers[args[0] - 1] = args[1];
 			break;
@@ -120,10 +110,10 @@ void VM::exec(MemAddr first_sector, MemAddr last_sector) {
 			registers[args[0] - 1] = tmp;
 			break;
 		case 0x31: {
-			MemCell high{RAM[PC + 1]};
-			MemCell low{RAM[PC + 2]};
+			MemCell high{RAM[proc.PC + 1]};
+			MemCell low{RAM[proc.PC + 2]};
 			MemAddr addr{static_cast<MemAddr>((high << 8) | low)};
-			PC = first_sector + addr;
+			proc.PC = proc.first_sector + addr;
 			++row;
 			continue;
 		}
@@ -143,54 +133,58 @@ void VM::exec(MemAddr first_sector, MemAddr last_sector) {
 		}
 		case 0x41:
 			if (flags.zero) {
-				MemCell high{RAM[PC + 1]};
-				MemCell low{RAM[PC + 2]};
+				MemCell high{RAM[proc.PC + 1]};
+				MemCell low{RAM[proc.PC + 2]};
 				MemAddr addr{
 				    static_cast<MemAddr>((high << 8) | low)};
-				PC = first_sector + addr;
+				proc.PC = proc.first_sector + addr;
 				++row;
 				continue;
 			} else {
-				PC += 3;
+				++row;
+				proc.PC += 3;
 				continue;
 			}
 		case 0x51:
 			if (!(flags.zero)) {
-				MemCell high{RAM[PC + 1]};
-				MemCell low{RAM[PC + 2]};
+				MemCell high{RAM[proc.PC + 1]};
+				MemCell low{RAM[proc.PC + 2]};
 				MemAddr addr{
 				    static_cast<MemAddr>((high << 8) | low)};
-				PC = first_sector + addr;
+				proc.PC = proc.first_sector + addr;
 				++row;
 				continue;
 			} else {
-				PC += 3;
+				++row;
+				proc.PC += 3;
 				continue;
 			}
 		case 0x61:
 			if (flags.sign) {
-				MemCell high{RAM[PC + 1]};
-				MemCell low{RAM[PC + 2]};
+				MemCell high{RAM[proc.PC + 1]};
+				MemCell low{RAM[proc.PC + 2]};
 				MemAddr addr{
 				    static_cast<MemAddr>((high << 8) | low)};
-				PC = first_sector + addr;
+				proc.PC = proc.first_sector + addr;
 				++row;
 				continue;
 			} else {
-				PC += 3;
+				++row;
+				proc.PC += 3;
 				continue;
 			}
 		case 0x71:
 			if (!(flags.sign)) {
-				MemCell high{RAM[PC + 1]};
-				MemCell low{RAM[PC + 2]};
+				MemCell high{RAM[proc.PC + 1]};
+				MemCell low{RAM[proc.PC + 2]};
 				MemAddr addr{
 				    static_cast<MemAddr>((high << 8) | low)};
-				PC = first_sector + addr;
+				proc.PC = proc.first_sector + addr;
 				++row;
 				continue;
 			} else {
-				PC += 3;
+				++row;
+				proc.PC += 3;
 				continue;
 			}
 		case 0xFF:
@@ -201,19 +195,20 @@ void VM::exec(MemAddr first_sector, MemAddr last_sector) {
 			running = false;
 			break;
 		default:
-			throw InvalidInstructionException(row, RAM[PC]);
+			throw InvalidInstructionException(row, RAM[proc.PC]);
 		}
 
-		PC += 1 + n_args;
+		proc.PC += 1 + n_args;
 		++row;
 	}
 	if (running) {
 		std::cerr << "\n\n--- Warning: program terminated forcefully "
-			     "because of unhalted exit ---"
+			     "because of unhalted exit to prevent stack "
+			     "corruption ---"
 			  << std::endl;
 	}
 
-	PC = first_sector; // Push PC back
+	proc.PC = proc.first_sector; // Push PC back
 }
 
 std::vector<std::pair<std::string_view, MemCell>> VM::register_snapshot() {
@@ -222,4 +217,12 @@ std::vector<std::pair<std::string_view, MemCell>> VM::register_snapshot() {
 		snap.push_back({el.first, registers[el.second - 1]});
 	}
 	return snap;
+}
+
+void VM::reset() {
+	// NOTE: Execution of code after VM::reset() results in undefined
+	// behaviour and should thus be avoided
+	flags = Flags();
+	registers = std::vector<Register>(VMRegisters::COUNT);
+	mem_manager.reset();
 }

@@ -5,22 +5,38 @@
 #include <fstream>
 
 #include "MemoryManager.hpp"
+#include "Process.hpp"
+#include "VMconf.hpp"
 
 class Loader {
       public:
-	MemAddr load_program(std::filesystem::path path_to_bin,
+	Process load_program(std::filesystem::path path_to_bin,
 			     MemoryManager &manager,
 			     std::vector<MemCell> &RAM) {
 		auto bytecode = read_binary_file(path_to_bin);
 
-		MemAddr first_sector = manager.allocate(bytecode.size());
+		std::size_t total_program_size{
+		    bytecode.size() + VMconf::PROGRAM_HEAP_STARTING_SIZE_BYTES +
+		    VMconf::PROGRAM_STACK_SIZE_BYTES};
+
+		MemAddr first_sector = manager.allocate(total_program_size);
 
 		for (std::size_t i{0uz}; i < bytecode.size(); ++i) {
 			RAM[first_sector + i] = bytecode[i];
 		}
 
-		return first_sector;
+		MemAddr ep_high{RAM[first_sector]};
+		MemAddr ep_low{RAM[first_sector + 1]};
+
+		MemAddr entry_point{static_cast<MemAddr>(
+		    (ep_high << 8 * sizeof(Opcode)) | ep_low)};
+
+		Process process(next_ready_pid++, first_sector, bytecode.size(),
+				entry_point);
+		return process;
 	}
+
+	void reset() { next_ready_pid = 1; }
 
       private:
 	std::vector<Opcode>
@@ -37,4 +53,5 @@ class Loader {
 
 		return bytecode;
 	}
+	PID next_ready_pid{1};
 };

@@ -5,6 +5,8 @@
 
 #include "../include/MemoryManager.hpp"
 
+#include "../include/VMconf.hpp"
+
 MemAddr MemoryManager::allocate(std::size_t bytes) {
 	MemAddr start_addr{};
 	bool found_match{false};
@@ -90,4 +92,9 @@ bool MemoryManager::check_integrity() {
 		prev_it = std::next(prev_it);
 	}
 	return true;
+}
+
+void MemoryManager::reset() {
+	free_list.clear();
+	free_list.push_back({0, RAM.size()});
 }

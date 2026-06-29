@@ -77,8 +77,8 @@ int main() {
 	assembler.asm_to_bin(code, "../tests/code.bin");
 
 	VM vm(instruction_table, REGISTER_MAP);
-	auto sectors{vm.load_program_in_ram("../tests/code.bin")};
-	vm.exec(sectors.first, sectors.second);
+	auto process{vm.load_program_in_ram("../tests/code.bin")};
+	vm.exec(process);
 	auto snap = vm.register_snapshot();
 
 	for (auto pair : snap) {
