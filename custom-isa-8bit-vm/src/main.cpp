@@ -25,6 +25,8 @@ int main() {
 	instruction_table.insert({InstructionSignature{"JNG", 1}, 0x71});
 	instruction_table.insert({InstructionSignature{"SPUSH", 1}, 0x81});
 	instruction_table.insert({InstructionSignature{"SPOP", 1}, 0x91});
+	instruction_table.insert({InstructionSignature{"HALLOC", 2}, 0xC2});
+	instruction_table.insert({InstructionSignature{"HFREE", 1}, 0xA1});
 
 	instruction_table.insert({InstructionSignature{"HALT", {}}, 0xFF});
 

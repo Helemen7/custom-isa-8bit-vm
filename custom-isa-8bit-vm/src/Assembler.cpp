@@ -143,6 +143,10 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 	std::unordered_map<std::string, MemAddr> addresses_of_labels{};
 
 	while (std::getline(code_stream, line)) {
+		auto cmt = line.find(';');
+		if (cmt != std::string::npos)
+			line = line.substr(0, cmt);
+
 		std::string first_tok;
 		std::stringstream line_stream(line);
 		if (!(line_stream >> first_tok))
@@ -201,10 +205,13 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 								  first_tok);
 			}
 		}
+		++line_number;
 	}
 
 	code_stream.clear();
 	code_stream.seekg(0, std::ios::beg);
+
+	line_number = 1;
 
 	// Set header for program start
 	MemAddr high =
@@ -219,6 +226,10 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 	codes.push_back(low);
 
 	while (std::getline(code_stream, line)) {
+		auto cmt = line.find(';');
+		if (cmt != std::string::npos)
+			line = line.substr(0, cmt);
+
 		if (line.empty())
 			continue;
 		if (line.back() == ':')
@@ -227,10 +238,8 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 		AsmTempInstruction instruction;
 		std::string token;
 
-		for (char &c : line) {
-			if (c == ',')
-				c = ' ';
-		}
+		for (char &c : line)
+			if (c == ',') c = ' ';
 
 		std::stringstream line_stream(line);
 		while (line_stream >> token) {

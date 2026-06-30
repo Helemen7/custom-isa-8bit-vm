@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "HeapReg.hpp"
 #include "MemoryManager.hpp"
 #include "Process.hpp"
 #include "VMconf.hpp"
@@ -33,6 +34,14 @@ class Loader {
 
 		Process process(next_ready_pid++, first_sector, bytecode.size(),
 				entry_point);
+
+		// Setup heap free-list first region header
+		RAM[first_sector + bytecode.size()] =
+		    (VMconf::PROGRAM_HEAP_STARTING_SIZE_BYTES >> 8) & 0xFF;
+		RAM[first_sector + bytecode.size() + 1] =
+		    VMconf::PROGRAM_HEAP_STARTING_SIZE_BYTES & 0xFF;
+		RAM[first_sector + bytecode.size() + 2] = HeapReg::FREE;
+
 		return process;
 	}
 
