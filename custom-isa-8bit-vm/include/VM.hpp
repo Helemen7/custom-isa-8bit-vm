@@ -38,4 +38,6 @@ class VM {
 	reverse_is(std::map<InstructionSignature, Opcode> &instruction_set);
 	MemCell &resolve_writeable_arg(Process &proc, Type type, MemAddr arg);
 	RawArgument fetch_argument(Process &proc);
+	void spush(RawArgument arg, Process &proc);
+	void spop(RawArgument arg, Process &proc);
 };

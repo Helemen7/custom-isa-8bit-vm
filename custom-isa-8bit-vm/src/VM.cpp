@@ -82,6 +82,52 @@ Process VM::load_program_in_ram(std::filesystem::path path_to_bin) {
 	return {type, value};
 }
 
+void VM::spush(RawArgument arg, Process &proc) {
+	MemAddr value = (arg.type == Type::NUMBER)
+			    ? arg.value
+			    : resolve_writeable_arg(proc, arg.type, arg.value);
+	std::size_t dim_to_alloc{1uz + (arg.type == Type::ADDRESS ||
+					arg.type == Type::INDIRECT_LBL ||
+					arg.type == Type::INDIRECT_MEM)};
+
+	proc.SP -= dim_to_alloc;
+
+	if (proc.SP < proc.stack_limit) {
+		throw std::runtime_error("Stack overflow!");
+	}
+
+	if (dim_to_alloc == 1) {
+		RAM[proc.SP] = value & 0xFF;
+	} else {
+		RAM[proc.SP] = (value >> 8) & 0xFF;
+		RAM[proc.SP + 1] = value & 0xFF;
+	}
+}
+
+void VM::spop(RawArgument arg, Process &proc) {
+	std::size_t dim_to_release{1uz + (arg.type == Type::ADDRESS ||
+					  arg.type == Type::INDIRECT_LBL ||
+					  arg.type == Type::INDIRECT_MEM)};
+
+	if (proc.SP + dim_to_release >
+	    proc.first_sector + proc.allocated_memory) {
+		throw std::runtime_error("Stack underflow!");
+	}
+
+	if (dim_to_release == 1) {
+		resolve_writeable_arg(proc, arg.type, arg.value) = RAM[proc.SP];
+	} else {
+		MemCell high{RAM[proc.SP]};
+		MemCell low{RAM[proc.SP + 1]};
+
+		MemAddr value = (static_cast<MemAddr>(high) << 8) | low;
+
+		resolve_writeable_arg(proc, arg.type, arg.value) = value;
+	}
+
+	proc.SP += dim_to_release;
+}
+
 void VM::exec(Process &proc) {
 	// Bootstrap offset is in first 2 bytes (start label position)
 	std::size_t row{1uz};
@@ -287,63 +333,27 @@ void VM::exec(Process &proc) {
 		case 0x81: {
 			// SPUSH
 			auto arg = fetch_argument(proc);
-			MemAddr value = (arg.type == Type::NUMBER)
-					    ? arg.value
-					    : resolve_writeable_arg(
-						  proc, arg.type, arg.value);
-			std::size_t dim_to_alloc{
-			    1uz + (arg.type == Type::ADDRESS ||
-				   arg.type == Type::INDIRECT_LBL ||
-				   arg.type == Type::INDIRECT_MEM)};
 
-			proc.SP -= dim_to_alloc;
-
-			if (proc.SP < proc.stack_limit) {
-				throw std::runtime_error("Stack overflow!");
-			}
-
-			if (dim_to_alloc == 1) {
-				RAM[proc.SP] = value & 0xFF;
-			} else {
-				RAM[proc.SP] = (value >> 8) & 0xFF;
-				RAM[proc.SP + 1] = value & 0xFF;
-			}
+			spush(arg, proc);
 
 			break;
 		}
 		case 0x91: {
 			// SPOP
+			// NOTE: Using stack arguments to pass values into a
+			// function is not supported, in favour of register and
+			// heap use. This is because the CALL instruction puts
+			// the function return address in the last stack
+			// element, making hypothetical arguments almost
+			// impossible to reach without destroying execution
+			// stack coherency.
 			auto arg = fetch_argument(proc);
+			spop(arg, proc);
 
-			std::size_t dim_to_release{
-			    1uz + (arg.type == Type::ADDRESS ||
-				   arg.type == Type::INDIRECT_LBL ||
-				   arg.type == Type::INDIRECT_MEM)};
-
-			if (proc.SP + dim_to_release >
-			    proc.first_sector + proc.allocated_memory) {
-				throw std::runtime_error("Stack underflow!");
-			}
-
-			if (dim_to_release == 1) {
-				resolve_writeable_arg(proc, arg.type,
-						      arg.value) = RAM[proc.SP];
-			} else {
-				MemCell high{RAM[proc.SP]};
-				MemCell low{RAM[proc.SP + 1]};
-
-				MemAddr value =
-				    (static_cast<MemAddr>(high) << 8) | low;
-
-				resolve_writeable_arg(proc, arg.type,
-						      arg.value) = value;
-			}
-
-			proc.SP += dim_to_release;
 			break;
 		}
 		case 0xC2: {
-			// HALLOC dest, size
+			// HALLOC
 			auto place_to_alloc{fetch_argument(proc)};
 			auto size_to_alloc{fetch_argument(proc)};
 
@@ -505,6 +515,36 @@ void VM::exec(Process &proc) {
 					current_chunk = next_chunk;
 				}
 			}
+			break;
+		}
+		case 0xB1: {
+			// CALL
+			auto arg{fetch_argument(proc)};
+			if (arg.type != Type::ADDRESS) {
+				throw std::logic_error(
+				    "Cannot call a non-label function");
+			}
+
+			MemAddr ret_addr = proc.PC;
+
+			proc.SP -= 2;
+			if (proc.SP < proc.stack_limit)
+				throw std::runtime_error("Stack overflow!");
+			RAM[proc.SP] = (ret_addr >> 8) & 0xFF;
+			RAM[proc.SP + 1] = ret_addr & 0xFF;
+			proc.PC = arg.value;
+			break;
+		}
+		case 0x20: {
+			// RET
+			if (proc.SP + 2 >
+			    proc.first_sector + proc.allocated_memory)
+				throw std::runtime_error("Stack underflow!");
+			MemAddr ret_addr =
+			    (static_cast<MemAddr>(RAM[proc.SP]) << 8) |
+			    RAM[proc.SP + 1];
+			proc.SP += 2;
+			proc.PC = ret_addr;
 			break;
 		}
 
