@@ -23,6 +23,8 @@ int main() {
 	instruction_table.insert({InstructionSignature{"JNE", 1}, 0x51});
 	instruction_table.insert({InstructionSignature{"JG", 1}, 0x61});
 	instruction_table.insert({InstructionSignature{"JNG", 1}, 0x71});
+	instruction_table.insert({InstructionSignature{"SPUSH", 1}, 0x81});
+	instruction_table.insert({InstructionSignature{"SPOP", 1}, 0x91});
 
 	instruction_table.insert({InstructionSignature{"HALT", {}}, 0xFF});
 

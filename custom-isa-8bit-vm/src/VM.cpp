@@ -267,6 +267,63 @@ void VM::exec(Process &proc) {
 			}
 			break;
 		}
+		case 0x81: {
+			auto arg = fetch_argument(proc);
+			MemAddr value = (arg.type == Type::NUMBER)
+					    ? arg.value
+					    : resolve_writeable_arg(
+						  proc, arg.type, arg.value);
+			std::size_t dim_to_alloc{
+			    1uz + (arg.type == Type::ADDRESS ||
+				   arg.type == Type::INDIRECT_LBL ||
+				   arg.type == Type::INDIRECT_MEM)};
+
+			proc.SP -= dim_to_alloc;
+
+			if (proc.SP < proc.stack_limit) {
+				throw std::runtime_error("Stack overflow!");
+			}
+
+			if (dim_to_alloc == 1) {
+				RAM[proc.SP] = value & 0xFF;
+			} else {
+				RAM[proc.SP] = (value >> 8) & 0xFF;
+				RAM[proc.SP + 1] = value & 0xFF;
+			}
+
+			break;
+		}
+		case 0x91: {
+			auto arg = fetch_argument(proc);
+
+			std::size_t dim_to_release{
+			    1uz + (arg.type == Type::ADDRESS ||
+				   arg.type == Type::INDIRECT_LBL ||
+				   arg.type == Type::INDIRECT_MEM)};
+
+			if (proc.SP + dim_to_release >
+			    proc.first_sector + proc.allocated_memory) {
+				throw std::runtime_error("Stack underflow!");
+			}
+
+			if (dim_to_release == 1) {
+				resolve_writeable_arg(proc, arg.type,
+						      arg.value) = RAM[proc.SP];
+			} else {
+				MemCell high{RAM[proc.SP]};
+				MemCell low{RAM[proc.SP + 1]};
+
+				MemAddr value =
+				    (static_cast<MemAddr>(high) << 8) | low;
+
+				resolve_writeable_arg(proc, arg.type,
+						      arg.value) = value;
+			}
+
+			proc.SP += dim_to_release;
+			break;
+		}
+
 		case 0xFF:
 			std::cout
 			    << "\n\n--- The program returned control to the "

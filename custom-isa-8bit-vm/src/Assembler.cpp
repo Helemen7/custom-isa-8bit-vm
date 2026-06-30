@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <charconv>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -17,9 +18,10 @@
 
 bool isAllAlpha(const std::string &str) {
 	if (str.empty())
-		return false; // Define behavior for empty strings
-	return std::all_of(str.begin(), str.end(),
-			   [](unsigned char c) { return std::isalpha(c); });
+		return false;
+	return std::all_of(str.begin(), str.end(), [](unsigned char c) {
+		return std::isalpha(c) || c == '_';
+	});
 }
 
 Assembler::Assembler(
@@ -208,6 +210,11 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 	MemAddr high =
 	    (addresses_of_labels["start"] << sizeof(MemCell) * 8) & 0xFF;
 	MemAddr low = addresses_of_labels["start"] & 0xFF;
+	if (addresses_of_labels["start"] ==
+	    0) { // If it's still at 0, it means the start tag is not there. we
+		 // inizialize it to 2
+		low = 0x02;
+	}
 	codes.push_back(high);
 	codes.push_back(low);
 
