@@ -3,7 +3,6 @@
 
 #include "../include/Assembler.hpp"
 #include "../include/InstructionSignature.hpp"
-#include "../include/Type.hpp"
 #include "../include/VM.hpp"
 #include "../include/types.hpp"
 
@@ -29,6 +28,8 @@ int main() {
 	instruction_table.insert({InstructionSignature{"HFREE", 1}, 0xA1});
 	instruction_table.insert({InstructionSignature{"CALL", 1}, 0xB1});
 	instruction_table.insert({InstructionSignature{"RET", 0}, 0x20});
+	instruction_table.insert({InstructionSignature{"FBSET", 2}, 0xD2});
+	instruction_table.insert({InstructionSignature{"FBSYNC", 0}, 0x30});
 
 	instruction_table.insert({InstructionSignature{"HALT", {}}, 0xFF});
 
@@ -43,6 +44,7 @@ int main() {
 	assembler.asm_to_bin(code, "../tests/code.bin");
 
 	VM vm(instruction_table, REGISTER_MAP);
+	vm.set_gui(true);
 	auto process{vm.load_program_in_ram("../tests/code.bin")};
 	vm.exec(process);
 	auto snap = vm.register_snapshot();

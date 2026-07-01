@@ -1,3 +1,4 @@
+#include <MiniFB.h>
 #include <alloca.h>
 #include <cstdint>
 
@@ -23,6 +24,7 @@ VM::VM(std::map<InstructionSignature, Opcode> &instruction_set,
     : registers(static_cast<std::size_t>(VMRegisters::COUNT)), RAM(64'000),
       register_map(_register_map), mem_manager(RAM) {
 	reverse_is(instruction_set);
+	framebuffer_start = RAM.size() - VMconf::FRAMEBUFFER_TOT_SIZE;
 }
 
 void VM::reverse_is(std::map<InstructionSignature, Opcode> &instruction_set) {
@@ -68,7 +70,7 @@ Process VM::load_program_in_ram(std::filesystem::path path_to_bin) {
 	MemAddr value = 0;
 
 	if (type == Type::ADDRESS || type == Type::INDIRECT_LBL ||
-	    type == Type::INDIRECT_MEM) {
+	    type == Type::INDIRECT_MEM || type == Type::NUMBER_16) {
 		uint8_t high = RAM[proc.PC];
 		uint8_t low = RAM[proc.PC + 1];
 		value = (high << 8) | low;
@@ -129,6 +131,17 @@ void VM::spop(RawArgument arg, Process &proc) {
 }
 
 void VM::exec(Process &proc) {
+
+	struct mfb_window *window;
+	if (get_gui()) {
+		window = mfb_open_ex(
+		    "VM - 8bit Framebuffer", VMconf::FRAMEBUFFER_WINDOW_WIDTH,
+		    VMconf::FRAMEBUFFER_WINDOW_HEIGHT, MFB_WF_RESIZABLE);
+	}
+
+	std::vector<uint32_t> host_display_buffer(VMconf::FRAMEBUFFER_TOT_SIZE,
+						  0);
+
 	// Bootstrap offset is in first 2 bytes (start label position)
 	std::size_t row{1uz};
 	while (proc.running && proc.PC < proc.last_code_sector) {
@@ -547,13 +560,103 @@ void VM::exec(Process &proc) {
 			proc.PC = ret_addr;
 			break;
 		}
+		case 0xD2: {
+			// FBSET
+			// NOTE: If one of the following arg types are used for
+			// pixel_index, they need to have a +1 to finish storing
+			// the value (for example, using reg A is correct if B
+			// exists, using D if there is no E isn't): (REGISTER,
+			// INDIRECT_MEM, INDIRECT_REG). INDIRECT_LBL is not
+			// supported. INDIRECT_REG + 1 is [A + 1], not [B].
+
+			auto pixel_index{fetch_argument(proc)};
+			auto pixel_color{fetch_argument(proc)};
+
+			if (pixel_index.type == Type::INDIRECT_LBL) {
+				throw std::logic_error(
+				    "There cannot be a numerical value in a "
+				    "label.");
+			}
+
+			if (!get_gui()) {
+				throw std::logic_error(
+				    "Cannot edit framebuffer if not in GUI "
+				    "mode");
+			}
+
+			MemAddr final_pixel_index = 0;
+
+			if (pixel_index.type == Type::NUMBER ||
+			    pixel_index.type == Type::NUMBER_16) {
+				final_pixel_index = pixel_index.value;
+			} else if (pixel_index.type == Type::REGISTER) {
+				uint8_t hi = resolve_writeable_arg(
+				    proc, Type::REGISTER, pixel_index.value);
+				uint8_t lo = resolve_writeable_arg(
+				    proc, Type::REGISTER,
+				    pixel_index.value + 1);
+				final_pixel_index =
+				    (static_cast<MemAddr>(hi) << 8) | lo;
+			} else if (pixel_index.type == Type::INDIRECT_REG) {
+				MemAddr base_addr =
+				    registers[pixel_index.value - 1];
+
+				MemAddr real_addr =
+				    proc.first_sector + base_addr;
+
+				uint8_t hi = RAM[real_addr];
+				uint8_t lo = RAM[real_addr + 1];
+				final_pixel_index =
+				    (static_cast<MemAddr>(hi) << 8) | lo;
+			} else if (pixel_index.type == Type::INDIRECT_MEM ||
+				   pixel_index.type == Type::ADDRESS) {
+				MemAddr real_addr =
+				    proc.first_sector + pixel_index.value;
+				uint8_t hi = RAM[real_addr];
+				uint8_t lo = RAM[real_addr + 1];
+				final_pixel_index =
+				    (static_cast<MemAddr>(hi) << 8) | lo;
+			}
+
+			pixel_color.value =
+			    (pixel_color.type == Type::NUMBER)
+				? pixel_color.value
+				: resolve_writeable_arg(proc, pixel_color.type,
+							pixel_color.value);
+
+			if (pixel_index.value >= VMconf::FRAMEBUFFER_TOT_SIZE) {
+				throw std::logic_error("Framebuffer overflow");
+			}
+
+			RAM[framebuffer_start + final_pixel_index] =
+			    pixel_color.value;
+			break;
+		}
+
+		case 0x30: {
+			// FBSYNC
+
+			for (std::size_t i = 0;
+			     i < VMconf::FRAMEBUFFER_TOT_SIZE; ++i) {
+				uint8_t color_index =
+				    RAM[framebuffer_start + i];
+				host_display_buffer[i] =
+				    VMconf::COLORS[color_index];
+			}
+			auto state =
+			    mfb_update_ex(window, host_display_buffer.data(),
+					  VMconf::FRAMEBUFFER_X_SIZE,
+					  VMconf::FRAMEBUFFER_Y_SIZE);
+
+			if (state != MFB_STATE_OK) {
+				std::cout << "Finestra chiusa dall'utente."
+					  << std::endl;
+				break;
+			}
+		}
 
 		case 0xFF:
 			// HALT
-			std::cout
-			    << "\n\n--- The program returned control to the "
-			       "operating system ---"
-			    << std::endl;
 			proc.running = false;
 			break;
 		default:
@@ -563,10 +666,29 @@ void VM::exec(Process &proc) {
 
 		++row;
 	}
+
+	if (window) {
+		std::cout << "\n\n--- Waiting for FB close ---" << std::endl;
+
+		while (mfb_wait_sync(window)) {
+
+			if (mfb_update_ex(window, host_display_buffer.data(),
+					  64, 64) != MFB_STATE_OK) {
+				break;
+			}
+		}
+
+		mfb_close(window);
+		window = nullptr;
+	}
 	if (proc.running) {
 		std::cerr << "\n\n--- Warning: program terminated forcefully "
 			     "because of unhalted exit to prevent stack "
 			     "corruption ---"
+			  << std::endl;
+	} else {
+		std::cout << "\n\n--- The program returned control to the "
+			     "operating system ---"
 			  << std::endl;
 	}
 
@@ -579,6 +701,20 @@ std::vector<std::pair<std::string_view, MemCell>> VM::register_snapshot() {
 		snap.push_back({el.first, registers[el.second - 1]});
 	}
 	return snap;
+}
+
+void VM::set_gui(bool gui_status) {
+	RAM[RAM.size() - VMconf::FRAMEBUFFER_TOT_SIZE - 1] =
+	    (gui_status) ? VMconf::Interface::GUI : VMconf::Interface::HEADLESS;
+}
+
+bool VM::get_gui() {
+	auto value = RAM[RAM.size() - VMconf::FRAMEBUFFER_TOT_SIZE - 1];
+	if (value == VMconf::Interface::GUI) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 void VM::reset() {

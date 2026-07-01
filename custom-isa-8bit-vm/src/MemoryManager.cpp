@@ -96,5 +96,5 @@ bool MemoryManager::check_integrity() {
 
 void MemoryManager::reset() {
 	free_list.clear();
-	free_list.push_back({0, RAM.size()});
+	free_list.push_back({0, RAM.size() - VMconf::FRAMEBUFFER_TOT_SIZE - 1});
 }

@@ -43,7 +43,11 @@ std::vector<Opcode> Assembler::instruction_to_opcode(
 		    instruction[i].data() + instruction[i].size(), temp)};
 		if (res.ec == std::errc{}) {
 			// Parsing succeeded
-			type_of_args[i - 1] = Type::NUMBER;
+			if (temp > 0xFF) {
+				type_of_args[i - 1] = Type::NUMBER_16;
+			} else {
+				type_of_args[i - 1] = Type::NUMBER;
+			}
 		} else {
 			// Parsing failed
 			std::string arg = instruction[i];
@@ -126,6 +130,14 @@ std::vector<Opcode> Assembler::instruction_to_opcode(
 		} else if (type == Type::NUMBER) {
 			codes.push_back(
 			    static_cast<MemCell>(std::stoi(inside)));
+		} else if (type == Type::NUMBER_16) {
+			int val = std::stoi(inside);
+
+			uint8_t high = static_cast<uint8_t>((val >> 8) & 0xFF);
+			uint8_t low = static_cast<uint8_t>(val & 0xFF);
+
+			codes.push_back(static_cast<MemCell>(high));
+			codes.push_back(static_cast<MemCell>(low));
 		}
 	}
 	return codes;
@@ -239,7 +251,8 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 		std::string token;
 
 		for (char &c : line)
-			if (c == ',') c = ' ';
+			if (c == ',')
+				c = ' ';
 
 		std::stringstream line_stream(line);
 		while (line_stream >> token) {
