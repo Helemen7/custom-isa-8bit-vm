@@ -45,3 +45,15 @@ A 8-bit simulated CPU in a VM coded from scratch, with custom instruction set an
 * **Heap Overflow Detection:** Safety abort mechanism triggered whenever a `HALLOC` request exceeds the maximum allocated heap capacity.
 * **Double Free & Invalid Free Protection:** Consistency validation on heap headers to catch duplicate releases or misaligned/corrupted pointers.
 * **Opcode Alignment Checker:** Fetch-decode-execute cycle validation that triggers immediate exceptions when encountering unknown or null (`0`) instruction opcodes.
+
+---
+
+### Custom Framebuffer Architecture & Graphics ISA
+* **Hardware Abstraction Layer (HAL):** Secure, isolated display subsystem bypassing raw Memory-Mapped I/O (MMIO) vulnerabilities to protect core system stability.
+* **Virtual Screen Topology:** Dynamic $64 \times 64$ grid resolution supporting an 8-bit indexed color palette, upscaled via a pixel-perfect *Nearest Neighbor* algorithm to guarantee crisp retro-graphics without CPU overhead.
+* **Asymmetric Fetch Optimization:** Compile-time argument sizing via the Assembler. Emits a compact 1-byte `NUMBER` token if the pixel index is $< 256$, and shifts automatically to a 2-byte `NUMBER_16` token if $\ge 256$, with runtime dynamic `PC` adaptation.
+* **Register Pairing Topology:** Native 16-bit expansion for 8-bit core registers. Passing a single register identifier (e.g., `A`) automatically pairs it with its contiguous hardware register (`A + 1`) to dynamically address the entire 4096-pixel space.
+* **Hardware-Enforced Sanitization:** Continuous out-of-bounds boundary checking that triggers immediate runtime exceptions on any framebuffer index $\ge 4096$, preventing heap or stack corruption.
+* **Atomic V-Sync Symmetrical Flush (`FBSYNC`):** Hardware-like vertical synchronization opcode that signals the C++ Host to convert the 8-bit backbuffer into a native 32-bit ARGB matrix and push it to the GPU, preventing screen tearing and thread locking.
+* **Hybrid Execution Subsystem:** Built-in hardware control registers that toggle between headless execution (for pure algorithmic testing, CI/CD, and fast benchmarks) and GUI mode (native OS-window instantiation) via single-byte state manipulation.
+
