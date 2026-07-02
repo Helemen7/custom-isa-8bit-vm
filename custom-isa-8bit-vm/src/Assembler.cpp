@@ -167,6 +167,13 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 		if ((first_tok.back()) == ':') {
 			first_tok.pop_back();
 			addresses_of_labels[first_tok] = current_dimension;
+		} else if (first_tok == ".skip") {
+			std::string size_str;
+			if (!(line_stream >> size_str)) {
+				throw std::runtime_error(
+				    "Missing argument for .skip directive");
+			}
+			current_dimension += std::stoull(size_str);
 		} else {
 			std::string arg;
 			std::vector<Type> arg_types;
@@ -264,6 +271,19 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 
 		if (instruction.back().back() == ':' ||
 		    instruction.front().back() == ':') {
+			continue;
+		}
+
+		if (instruction[0] == ".skip") {
+			if (instruction.size() != 2) {
+				throw std::runtime_error(
+				    "Invalid .skip directive");
+			}
+			std::size_t skip_sz = std::stoull(instruction[1]);
+			for (std::size_t i = 0; i < skip_sz; ++i) {
+				codes.push_back(0);
+			}
+			++line_number;
 			continue;
 		}
 

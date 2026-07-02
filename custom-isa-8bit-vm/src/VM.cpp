@@ -137,6 +137,30 @@ void VM::exec(Process &proc) {
 		window = mfb_open_ex(
 		    "VM - 8bit Framebuffer", VMconf::FRAMEBUFFER_WINDOW_WIDTH,
 		    VMconf::FRAMEBUFFER_WINDOW_HEIGHT, MFB_WF_RESIZABLE);
+
+		mfb_set_keyboard_callback(
+		    [this](struct mfb_window *, mfb_key key, mfb_key_mod,
+			   bool is_pressed) {
+			    if (!is_pressed)
+				    return;
+			    switch (key) {
+			    case MFB_KB_KEY_UP:
+				    _last_key = 1;
+				    break;
+			    case MFB_KB_KEY_DOWN:
+				    _last_key = 2;
+				    break;
+			    case MFB_KB_KEY_LEFT:
+				    _last_key = 3;
+				    break;
+			    case MFB_KB_KEY_RIGHT:
+				    _last_key = 4;
+				    break;
+			    default:
+				    break;
+			    }
+		    },
+		    window);
 	}
 
 	std::vector<uint32_t> host_display_buffer(VMconf::FRAMEBUFFER_TOT_SIZE,
@@ -151,6 +175,10 @@ void VM::exec(Process &proc) {
 		++proc.PC; // Go from Opcode byte to first type
 
 		switch (current_opcode) {
+		case 0x00: {
+			// NOP
+			break;
+		}
 		case 0x12: {
 			// MOV
 			auto dest{fetch_argument(proc)};
@@ -242,8 +270,16 @@ void VM::exec(Process &proc) {
 		case 0x21: {
 			// INPUT
 			auto arg = fetch_argument(proc);
-			std::cin >> tmp;
-			resolve_writeable_arg(proc, arg.type, arg.value) = tmp;
+			MemCell input_val = 0;
+			if (get_gui() && window) {
+				input_val = _last_key;
+				_last_key = 0;
+			} else {
+				std::cin >> tmp;
+				input_val = static_cast<MemCell>(tmp);
+			}
+			resolve_writeable_arg(proc, arg.type, arg.value) =
+			    input_val;
 			break;
 		}
 		case 0x31: {
@@ -643,6 +679,9 @@ void VM::exec(Process &proc) {
 				host_display_buffer[i] =
 				    VMconf::COLORS[color_index];
 			}
+
+			mfb_wait_sync(window);
+
 			auto state =
 			    mfb_update_ex(window, host_display_buffer.data(),
 					  VMconf::FRAMEBUFFER_X_SIZE,
@@ -653,6 +692,7 @@ void VM::exec(Process &proc) {
 					  << std::endl;
 				break;
 			}
+			break;
 		}
 
 		case 0xFF:

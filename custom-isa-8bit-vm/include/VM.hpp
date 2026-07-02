@@ -35,6 +35,7 @@ class VM {
 	std::vector<Register> registers;
 	Flags flags;
 	MemAddr framebuffer_start{};
+	uint8_t _last_key{0};
 	const std::unordered_map<std::string_view, uint8_t> &register_map;
 	void
 	reverse_is(std::map<InstructionSignature, Opcode> &instruction_set);

@@ -8,6 +8,7 @@
 
 int main() {
 	std::map<InstructionSignature, Opcode> instruction_table;
+	instruction_table.insert({InstructionSignature{"NOP", 0}, 0x00});
 	instruction_table.insert({InstructionSignature{"MOV", 2}, 0x12});
 	instruction_table.insert({InstructionSignature{"PRINT", 1}, 0x01});
 	instruction_table.insert({InstructionSignature{"PRINTFLUSH", 0}, 0x10});
