@@ -1,6 +1,8 @@
 #include <iostream>
 #include <map>
 
+#include "Brainfvck.hpp"
+
 #include "../include/Assembler.hpp"
 #include "../include/InstructionSignature.hpp"
 #include "../include/VM.hpp"
@@ -34,17 +36,21 @@ int main() {
 
 	instruction_table.insert({InstructionSignature{"HALT", {}}, 0xFF});
 
-	const std::unordered_map<std::string_view, uint8_t> REGISTER_MAP = {
+	const std::unordered_map<std::string_view, uint8_t> regmap = {
 	    {"A", 1}, {"B", 2}, {"C", 3}, {"D", 4}};
 
-	Assembler assembler(instruction_table, REGISTER_MAP);
+	Assembler assembler(instruction_table, regmap);
 	std::string code{};
 
 	assembler.asm_file_to_code("../tests/code.asm", code);
 
 	assembler.asm_to_bin(code, "../tests/code.bin");
 
-	VM vm(instruction_table, REGISTER_MAP);
+	// Brainfvck bf(assembler);
+
+	// bf.compile("../tests/code.bf", "../tests/code.bin");
+
+	VM vm(instruction_table, regmap);
 	vm.set_gui(true);
 	auto process{vm.load_program_in_ram("../tests/code.bin")};
 	vm.exec(process);

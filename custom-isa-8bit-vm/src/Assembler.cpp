@@ -184,7 +184,9 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 				if (register_map.contains(arg))
 					arg_types.push_back(Type::REGISTER);
 				else if (addresses_of_labels.contains(arg) ||
-					 isAllAlpha(arg))
+					 (!arg.empty() &&
+					  (std::isalpha(arg[0]) ||
+					   arg[0] == '_')))
 					arg_types.push_back(Type::ADDRESS);
 				else if (arg.front() == '[' &&
 					 arg.back() == ']') {
@@ -234,7 +236,7 @@ std::vector<Opcode> Assembler::asm_to_opcodes(AsmCode code) {
 
 	// Set header for program start
 	MemAddr high =
-	    (addresses_of_labels["start"] << sizeof(MemCell) * 8) & 0xFF;
+	    (addresses_of_labels["start"] >> sizeof(MemCell) * 8) & 0xFF;
 	MemAddr low = addresses_of_labels["start"] & 0xFF;
 	if (addresses_of_labels["start"] ==
 	    0) { // If it's still at 0, it means the start tag is not there. we

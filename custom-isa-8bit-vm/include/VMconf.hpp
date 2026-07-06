@@ -30,5 +30,4 @@ constexpr uint32_t COLORS[] = {
     0xFFFF00FF, // Magenta
     0xFF00FFFF, // Cyan
 };
-
 } // namespace VMconf

@@ -12,7 +12,7 @@ if(APPLE)
     set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_PLATFORM_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
-add_executable(custom-isa-8bit-vm src/main.cpp src/VM.cpp src/Assembler.cpp src/MemoryManager.cpp)
+add_executable(custom-isa-8bit-vm src/main.cpp src/VM.cpp src/Assembler.cpp src/MemoryManager.cpp src/Brainfvck.cpp)
 add_subdirectory(external/minifb)
 target_link_libraries(custom-isa-8bit-vm PRIVATE minifb)
 target_include_directories(custom-isa-8bit-vm PRIVATE external/minifb/include)

@@ -199,7 +199,7 @@ void VM::exec(Process &proc) {
 					    ? static_cast<MemCell>(el.value)
 					    : resolve_writeable_arg(
 						  proc, el.type, el.value);
-			std::cout << static_cast<int>(value);
+			std::cout << value;
 			break;
 		}
 		case 0x10: {
@@ -707,7 +707,7 @@ void VM::exec(Process &proc) {
 		++row;
 	}
 
-	if (window) {
+	if (get_gui() && window) {
 		std::cout << "\n\n--- Waiting for FB close ---" << std::endl;
 
 		while (mfb_wait_sync(window)) {
