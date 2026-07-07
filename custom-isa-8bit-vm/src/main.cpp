@@ -42,16 +42,16 @@ int main() {
 	Assembler assembler(instruction_table, regmap);
 	std::string code{};
 
-	assembler.asm_file_to_code("../tests/code.asm", code);
+	// assembler.asm_file_to_code("../tests/code.asm", code);
 
-	assembler.asm_to_bin(code, "../tests/code.bin");
+	// assembler.asm_to_bin(code, "../tests/code.bin");
 
-	// Brainfvck bf(assembler);
+	Brainfvck bf(assembler);
 
-	// bf.compile("../tests/code.bf", "../tests/code.bin");
+	bf.compile("../tests/code.bf", "../tests/code.bin");
 
 	VM vm(instruction_table, regmap);
-	vm.set_gui(true);
+	vm.set_gui(false);
 	auto process{vm.load_program_in_ram("../tests/code.bin")};
 	vm.exec(process);
 	auto snap = vm.register_snapshot();
